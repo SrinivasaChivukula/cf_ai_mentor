@@ -19,6 +19,9 @@ interface WorkflowParams {
 }
 
 // ─── Workflow — deep coaching analysis ────────────────────────────────────────
+// 3 steps: analyse session → generate follow-up q → persist back to the DO
+// workflows are great for this because each step retries independently if it fails
+// no more worrying about timeouts on long AI calls
 
 export class CoachingWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
   async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
@@ -327,5 +330,6 @@ Your coaching style:
 - When evaluating code or pseudocode, check for edge cases, complexity, and correctness
 
 IMPORTANT: Keep your responses focused and under 300 words unless explaining something complex.
+# and make it feel like a real interview, not a quiz
 Start by greeting the candidate briefly and asking your first ${topic} interview question.`;
 }

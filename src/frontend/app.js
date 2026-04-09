@@ -230,6 +230,8 @@ analyzeBtn.addEventListener("click", async () => {
 });
 
 function pollWorkflow(workflowId) {
+  // polling every 3s — workflow usually takes 15-30s so this isn't too spammy
+  // could use websockets but polling is fine for the analysis use case
   if (state.workflowPollInterval) clearInterval(state.workflowPollInterval);
   state.workflowPollInterval = setInterval(async () => {
     try {
@@ -283,6 +285,9 @@ function renderAnalysis(analysis, followUp) {
 }
 
 // ─── Voice Input ──────────────────────────────────────────────────────────────
+// voice input — using Web Speech API, no extra deps needed
+// interimResults lets text appear while speaking which feels way more natural
+// auto-sends on end if theres a transcript, otherwise waits for the user
 let recognition = null;
 
 if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {

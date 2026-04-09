@@ -12,7 +12,7 @@ class_name = "SessionStore"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SessionStore"]
+new_sqlite_classes = ["SessionStore"]
 
 [[workflows]]
 name = "coaching-workflow"
@@ -22,3 +22,4 @@ class_name = "CoachingWorkflow"
 [assets]
 directory = "./src/frontend"
 binding = "ASSETS"
+

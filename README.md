@@ -1,140 +1,102 @@
-# CF AI Mentor ⚡
+# Cloudflare AI Mentor ⚡
 
-> An AI-powered technical interview coach built entirely on Cloudflare's developer platform.
+An AI-powered technical interview coach running entirely on Cloudflare's edge platform.
 
-![Tech Stack](https://img.shields.io/badge/Cloudflare-Workers%20AI-orange?logo=cloudflare)
-![Llama](https://img.shields.io/badge/LLM-Llama%203.3%2070B-blue)
+![Cloudflare Workers AI](https://img.shields.io/badge/Cloudflare-Workers%20AI-orange?logo=cloudflare)
+![Llama 3.3 70B](https://img.shields.io/badge/LLM-Llama%203.3%2070B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)
+
+🔗 **Live Demo:** https://cf-ai-mentor.lucifer96389.workers.dev
 
 ---
 
-## What is CF AI Mentor?
+## What it does
 
-CF AI Mentor is a full-stack AI application that simulates real technical interviews across multiple topics (DSA, System Design, JavaScript, and more). It provides:
+Pick a topic (DSA, System Design, JavaScript, etc.), pick a difficulty, and get dropped into a mock technical interview. The AI coach asks questions one at a time, gives you feedback on your answers, and tracks the conversation across the session. After a few exchanges, you can trigger a deep analysis that scores your communication and technical accuracy, identifies gaps, and suggests what to focus on next.
 
-- **Real-time coaching** with streaming AI responses via Llama 3.3 70B
-- **Persistent memory** — the AI remembers your entire conversation history within a session
-- **Deep performance analysis** — a multi-step Workflow analyses your strengths, gaps, and scores
-- **Voice input** — speak your answers using the Web Speech API
-- **Beautiful UI** — dark glassmorphism design served from Cloudflare Assets
+Features:
+- Streaming responses from Llama 3.3 70B via Cloudflare Workers AI
+- Conversation memory per session using Durable Objects (keeps last 50 messages)
+- Multi-step analysis pipeline using Cloudflare Workflows
+- Voice input via the Web Speech API — just speak your answer
+- 8 interview topics and 3 difficulty levels
 
 ---
 
-## Architecture
+## How it's built
 
 ```
-User Browser
-    │
-    ├── Chat / Voice Input
-    │
-    ▼
+Browser
+  │
+  ├── chat / voice input
+  │
+  ▼
 Cloudflare Worker (src/worker/index.ts)
-    │
-    ├── /api/chat  ──────► Workers AI (Llama 3.3 70B, streaming SSE)
-    │
-    ├── /api/analyze ────► Cloudflare Workflow (CoachingWorkflow)
-    │                           ├─ Step 1: Analyse session (Llama 3.3)
-    │                           ├─ Step 2: Generate follow-up question
-    │                           └─ Step 3: Persist analysis → Durable Object
-    │
-    ├── /api/session/:id ► Durable Object (SessionStore)
-    │                           └─ Persistent conversation history + stats
-    │
-    └── /*  ─────────────► Cloudflare Assets (static frontend)
+  │
+  ├── /api/chat ──────► Workers AI  (Llama 3.3 70B, streaming SSE)
+  │
+  ├── /api/analyze ───► Workflow (CoachingWorkflow)
+  │                         ├─ step 1: analyse session with Llama 3.3
+  │                         ├─ step 2: generate a follow-up question
+  │                         └─ step 3: save result → Durable Object
+  │
+  ├── /api/session/:id ► Durable Object (SessionStore)
+  │                         └─ persistent conversation history + stats
+  │
+  └── /* ─────────────► Cloudflare Assets (static frontend)
 ```
 
-### Cloudflare Components
-
-| Component | Purpose |
+| Component | What it's used for |
 |---|---|
-| **Workers AI** (Llama 3.3 70B FP8) | LLM powering all chat responses |
-| **Durable Objects** (`SessionStore`) | Per-session persistent memory — conversation history, stats, analysis results |
-| **Workflows** (`CoachingWorkflow`) | Multi-step AI pipeline for deep performance analysis |
-| **Assets** | Serves the static frontend (HTML/CSS/JS) |
+| Workers AI (Llama 3.3 70B FP8) | Powers all AI responses |
+| Durable Objects (SessionStore) | Stores conversation history, session stats, and analysis results per session |
+| Workflows (CoachingWorkflow) | Runs the 3-step analysis pipeline |
+| Assets | Serves the frontend |
 
 ---
 
-## Features
+## Running locally
 
-- 🎯 **8 interview topics** — DSA, System Design, JavaScript, Python, SQL, Distributed Systems, ML, Behavioral
-- 📊 **3 difficulty levels** — Easy (Junior), Medium (Mid-level), Hard (Senior / FAANG)
-- 💾 **Session memory** — Durable Objects store up to 50 messages per session with metadata
-- 🔄 **Deep Analysis Workflow** — runs a 3-step AI pipeline and returns communication/technical scores, identified strengths, knowledge gaps, and a suggested follow-up question
-- 🎙️ **Voice input** — uses the Web Speech API to transcribe spoken answers
-- 📡 **Streaming responses** — Llama 3.3 streams tokens in real-time via SSE
-- 🧹 **New session** — clear history and start fresh anytime
-
----
-
-## Running Locally
-
-### Prerequisites
-
-- [Node.js 18+](https://nodejs.org/)
-- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- Wrangler CLI (`npm install -g wrangler`)
-
-### 1. Clone the repo
+You'll need Node.js 18+, a Cloudflare account (free tier is fine), and Wrangler.
 
 ```bash
-git clone https://github.com/<your-username>/cf_ai_mentor.git
+git clone https://github.com/SrinivasaChivukula/cf_ai_mentor.git
 cd cf_ai_mentor
-```
-
-### 2. Install dependencies
-
-```bash
 npm install
-```
-
-### 3. Authenticate with Cloudflare
-
-```bash
 npx wrangler login
+npx wrangler dev --remote
 ```
 
-### 4. Run locally
+The `--remote` flag is needed because Workers AI runs on Cloudflare's edge — it doesn't run locally. Everything else (Durable Objects, Workflows, Assets) runs locally through Wrangler.
 
-```bash
-npm run dev
-```
-
-Wrangler will start a local dev server at **http://localhost:8787**. Workers AI, Durable Objects, and Workflows all work locally via `wrangler dev`.
-
-> **Note:** Workers AI calls may be slower locally since they're proxied to Cloudflare's edge. Durable Objects and Workflows run fully locally.
+Open http://localhost:8787 in your browser.
 
 ---
 
-## Deploying to Cloudflare
-
-### 1. Deploy
+## Deploying
 
 ```bash
 npm run deploy
 ```
 
-This publishes your Worker + Assets to Cloudflare's global network. You'll get a `*.workers.dev` URL immediately.
-
-### 2. (Optional) Custom domain
-
-1. Go to the Cloudflare dashboard → Workers & Pages → your Worker
-2. Under "Settings → Triggers", add a custom domain
+You'll get a `*.workers.dev` URL right away. To use a custom domain, go to the Cloudflare dashboard → Workers & Pages → your worker → Settings → Triggers.
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 cf_ai_mentor/
 ├── src/
 │   ├── worker/
-│   │   ├── index.ts          # Main Worker — routing, CoachingWorkflow, exports
-│   │   └── session-store.ts  # Durable Object — persistent session memory
+│   │   ├── index.ts          # worker entry point + CoachingWorkflow
+│   │   └── session-store.ts  # Durable Object for session memory
 │   └── frontend/
-│       ├── index.html        # App shell
-│       ├── styles.css        # Dark glassmorphism design
-│       └── app.js            # Client logic — streaming, voice, workflow polling
-├── wrangler.toml             # Cloudflare binding config
+│       ├── index.html
+│       ├── styles.css
+│       └── app.js
+├── wrangler.toml
 ├── tsconfig.json
 ├── package.json
 ├── README.md
@@ -143,30 +105,28 @@ cf_ai_mentor/
 
 ---
 
-## API Reference
+## API
 
-| Endpoint | Method | Description |
+| Endpoint | Method | What it does |
 |---|---|---|
-| `/api/chat` | `POST` | Stream a chat response from Llama 3.3 |
-| `/api/analyze` | `POST` | Trigger a deep-analysis Workflow |
-| `/api/workflow/:id` | `GET` | Poll Workflow status |
-| `/api/session/:id` | `GET` | Get session history + stats |
-| `/api/session/:id/analysis` | `GET` | Get the latest analysis result |
-| `/api/session/:id` | `DELETE` | Clear a session |
+| `/api/chat` | POST | Stream a response from Llama 3.3 |
+| `/api/analyze` | POST | Kick off a deep analysis Workflow |
+| `/api/workflow/:id` | GET | Check Workflow status |
+| `/api/session/:id` | GET | Get session history and stats |
+| `/api/session/:id/analysis` | GET | Get the latest analysis result |
+| `/api/session/:id` | DELETE | Clear the session |
 
 ---
 
-## Tech Stack
+## Tech
 
-- **Runtime**: Cloudflare Workers (TypeScript)
-- **LLM**: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` via Workers AI
-- **Memory**: Cloudflare Durable Objects
-- **Coordination**: Cloudflare Workflows
-- **Frontend**: Vanilla HTML/CSS/JS (no framework) served via Cloudflare Assets
-- **Voice**: Web Speech API (browser-native)
+- Cloudflare Workers (TypeScript)
+- Llama 3.3 70B via Cloudflare Workers AI
+- Cloudflare Durable Objects for session memory
+- Cloudflare Workflows for multi-step AI pipelines
+- Vanilla HTML/CSS/JS frontend, no framework
+- Web Speech API for voice input
 
 ---
-
-## License
 
 MIT © Dattanand Shetty
