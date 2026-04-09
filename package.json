@@ -1,0 +1,25 @@
+{
+  "name": "cf-ai-mentor",
+  "version": "1.0.0",
+  "description": "AI-powered technical interview coach built on Cloudflare Workers AI, Durable Objects, and Workflows",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers-ai",
+    "llama",
+    "interview",
+    "coach"
+  ],
+  "author": "Dattanand Shetty",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260409.1",
+    "typescript": "^6.0.2",
+    "wrangler": "^4.81.0"
+  }
+}

@@ -1,0 +1,24 @@
+name = "cf-ai-mentor"
+main = "src/worker/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "SESSION_STORE"
+class_name = "SessionStore"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SessionStore"]
+
+[[workflows]]
+name = "coaching-workflow"
+binding = "COACHING_WORKFLOW"
+class_name = "CoachingWorkflow"
+
+[assets]
+directory = "./src/frontend"
+binding = "ASSETS"
