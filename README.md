@@ -129,4 +129,4 @@ cf_ai_mentor/
 
 ---
 
-MIT © Dattanand Shetty
+MIT © DSrinivasa Chivukula
