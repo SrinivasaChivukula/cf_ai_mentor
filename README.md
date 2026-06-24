@@ -129,4 +129,4 @@ cf_ai_mentor/
 
 ---
 
-MIT © DSrinivasa Chivukula
+MIT © Srinivasa Chivukula
