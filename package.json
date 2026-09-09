@@ -4,8 +4,11 @@
   "description": "AI-powered technical interview coach built on Cloudflare Workers AI, Durable Objects, and Workflows",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev:frontend": "vite",
+    "build": "vite build",
+    "deploy": "npm run build && wrangler deploy",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "cf-typegen": "wrangler types"
   },
   "keywords": [
@@ -15,11 +18,20 @@
     "interview",
     "coach"
   ],
-  "author": "Dattanand Shetty",
+  "author": "Srinivasa Chivukula",
   "license": "MIT",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260409.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "typescript": "^6.0.2",
+    "vite": "^8.2.2",
     "wrangler": "^4.81.0"
+  },
+  "dependencies": {
+    "lucide-react": "^1.43.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   }
 }
