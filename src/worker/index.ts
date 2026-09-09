@@ -9,6 +9,7 @@ export interface Env {
   SESSION_STORE: DurableObjectNamespace;
   COACHING_WORKFLOW: Workflow;
   ASSETS: Fetcher;
+  DB?: D1Database;
 }
 
 interface WorkflowParams {
@@ -16,6 +17,82 @@ interface WorkflowParams {
   topic: string;
   difficulty: string;
   history: Array<{ role: string; content: string }>;
+}
+
+// ─── D1 Relational Storage Helpers ────────────────────────────────────────────
+
+export async function syncSessionToD1(
+  db: D1Database | undefined,
+  sessionId: string,
+  topic: string,
+  difficulty: string,
+  messageCount: number
+) {
+  if (!db) return;
+  try {
+    const now = Date.now();
+    await db
+      .prepare(
+        `INSERT INTO sessions (id, topic, difficulty, message_count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           topic = excluded.topic,
+           difficulty = excluded.difficulty,
+           message_count = excluded.message_count,
+           updated_at = excluded.updated_at`
+      )
+      .bind(sessionId, topic, difficulty, messageCount, now, now)
+      .run();
+  } catch (err) {
+    console.error("D1 session sync error:", err);
+  }
+}
+
+export async function syncMessageToD1(
+  db: D1Database | undefined,
+  sessionId: string,
+  role: string,
+  content: string
+) {
+  if (!db) return;
+  try {
+    await db
+      .prepare(
+        `INSERT INTO messages (session_id, role, content, created_at)
+         VALUES (?, ?, ?, ?)`
+      )
+      .bind(sessionId, role, content, Date.now())
+      .run();
+  } catch (err) {
+    console.error("D1 message sync error:", err);
+  }
+}
+
+export async function syncEvaluationToD1(
+  db: D1Database | undefined,
+  sessionId: string,
+  analysis: any,
+  followUp: string
+) {
+  if (!db) return;
+  try {
+    const commScore = typeof analysis?.communicationScore === "number" ? analysis.communicationScore : null;
+    const techScore = typeof analysis?.technicalScore === "number" ? analysis.technicalScore : null;
+    const strengths = JSON.stringify(analysis?.strengths ?? []);
+    const gaps = JSON.stringify(analysis?.gaps ?? []);
+    const nextFocus = JSON.stringify(analysis?.nextFocus ?? []);
+    const rawOutput = analysis?.raw ? String(analysis.raw) : null;
+
+    await db
+      .prepare(
+        `INSERT INTO evaluations (session_id, communication_score, technical_score, strengths, gaps, next_focus, follow_up_question, raw_output, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(sessionId, commScore, techScore, strengths, gaps, nextFocus, followUp, rawOutput, Date.now())
+      .run();
+  } catch (err) {
+    console.error("D1 evaluation sync error:", err);
+  }
 }
 
 // ─── Workflow — deep coaching analysis ────────────────────────────────────────
@@ -93,6 +170,12 @@ Return a JSON object with keys: strengths (array), gaps (array), communicationSc
       return "persisted";
     });
 
+    // Step 4: Persist the evaluation to Cloudflare D1
+    await step.do("persist-to-d1", async () => {
+      await syncEvaluationToD1(this.env.DB, sessionId, analysis, followUp);
+      return "persisted-d1";
+    });
+
     return { analysis, followUp };
   }
 }
@@ -148,6 +231,10 @@ export default {
         body: JSON.stringify({ role: "user", content: message, topic, difficulty }),
       });
 
+      // Also persist to D1 for relational queries and analytics
+      await syncMessageToD1(env.DB, sessionId, "user", message);
+      await syncSessionToD1(env.DB, sessionId, topic, difficulty, (stats.messageCount ?? 0) + 1);
+
       const messages: RoleScopedChatInput[] = [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({
@@ -185,7 +272,7 @@ export default {
           }
         } finally {
           await writer.close();
-          // Save assistant response to DO (best-effort)
+          // Save assistant response to DO and D1 (best-effort)
           try {
             const textMatch = fullResponse.match(/data: \{"response":"([^"]+)"/g);
             if (textMatch) {
@@ -200,6 +287,8 @@ export default {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ role: "assistant", content: assembled }),
               });
+              await syncMessageToD1(env.DB, sessionId, "assistant", assembled);
+              await syncSessionToD1(env.DB, sessionId, topic, difficulty, (stats.messageCount ?? 0) + 2);
             }
           } catch { /* non-critical */ }
         }
@@ -289,12 +378,107 @@ export default {
       });
     }
 
-    // DELETE /api/session/:id — clear session
+    // GET /api/analytics — relational stats across sessions from D1
+    if (path === "/api/analytics" && request.method === "GET") {
+      if (!env.DB) {
+        return new Response(
+          JSON.stringify({
+            totalSessions: 0,
+            totalMessages: 0,
+            avgCommunicationScore: 0,
+            avgTechnicalScore: 0,
+            totalEvaluations: 0,
+            topicDistribution: [],
+            recentEvaluations: [],
+            notice: "D1 database not configured",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        const sessionCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM sessions").first<{ count: number }>();
+        const messageCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM messages").first<{ count: number }>();
+        const scoreAvgResult = await env.DB.prepare(`
+          SELECT 
+            ROUND(AVG(communication_score), 1) as avg_comm,
+            ROUND(AVG(technical_score), 1) as avg_tech,
+            COUNT(*) as total_evals
+          FROM evaluations
+          WHERE communication_score IS NOT NULL
+        `).first<{ avg_comm: number | null; avg_tech: number | null; total_evals: number }>();
+
+        const topicDistribution = await env.DB.prepare(`
+          SELECT topic, COUNT(*) as count
+          FROM sessions
+          GROUP BY topic
+          ORDER BY count DESC
+          LIMIT 8
+        `).all();
+
+        const recentEvaluations = await env.DB.prepare(`
+          SELECT e.id, e.session_id, s.topic, s.difficulty, e.communication_score, e.technical_score, e.created_at
+          FROM evaluations e
+          LEFT JOIN sessions s ON e.session_id = s.id
+          ORDER BY e.created_at DESC
+          LIMIT 5
+        `).all();
+
+        return new Response(
+          JSON.stringify({
+            totalSessions: sessionCountResult?.count ?? 0,
+            totalMessages: messageCountResult?.count ?? 0,
+            avgCommunicationScore: scoreAvgResult?.avg_comm ?? 0,
+            avgTechnicalScore: scoreAvgResult?.avg_tech ?? 0,
+            totalEvaluations: scoreAvgResult?.total_evals ?? 0,
+            topicDistribution: topicDistribution.results ?? [],
+            recentEvaluations: recentEvaluations.results ?? [],
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (err: any) {
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch analytics", details: err?.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // GET /api/sessions — list recent sessions from D1
+    if (path === "/api/sessions" && request.method === "GET") {
+      if (!env.DB) {
+        return new Response(JSON.stringify({ sessions: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      try {
+        const { results } = await env.DB.prepare(
+          "SELECT id, topic, difficulty, message_count, created_at, updated_at FROM sessions ORDER BY updated_at DESC LIMIT 20"
+        ).all();
+        return new Response(JSON.stringify({ sessions: results ?? [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err: any) {
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch sessions", details: err?.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // DELETE /api/session/:id — clear session in DO and D1
     if (path.startsWith("/api/session/") && request.method === "DELETE") {
       const sessionId = path.replace("/api/session/", "");
       const id = env.SESSION_STORE.idFromName(sessionId);
       const stub = env.SESSION_STORE.get(id);
       await stub.fetch("https://internal/clear", { method: "POST" });
+      if (env.DB) {
+        try {
+          await env.DB.prepare("DELETE FROM messages WHERE session_id = ?").bind(sessionId).run();
+          await env.DB.prepare("DELETE FROM evaluations WHERE session_id = ?").bind(sessionId).run();
+          await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId).run();
+        } catch { /* ignore */ }
+      }
       return new Response(JSON.stringify({ cleared: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

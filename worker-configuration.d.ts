@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 		ASSETS: Fetcher;
 		SESSION_STORE: DurableObjectNamespace<import("./src/worker/index").SessionStore>;
 		COACHING_WORKFLOW: Workflow<Parameters<import("./src/worker/index").CoachingWorkflow['run']>[0]['payload']>;
+		DB: D1Database;
 	}
 }
 interface Env extends Cloudflare.Env {}

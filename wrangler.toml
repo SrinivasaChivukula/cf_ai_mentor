@@ -19,7 +19,13 @@ name = "coaching-workflow"
 binding = "COACHING_WORKFLOW"
 class_name = "CoachingWorkflow"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "cf-ai-mentor-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "./migrations"
+
 [assets]
-directory = "./src/frontend"
+directory = "./dist"
 binding = "ASSETS"
 
