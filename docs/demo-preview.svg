@@ -1,0 +1,105 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0b0f17"/>
+  <defs>
+    <linearGradient id="bg-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f38020" stop-opacity="0.18"/>
+      <stop offset="50%" stop-color="#3b82f6" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#0b0f17" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="orange-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f38020"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg-glow)"/>
+
+  <g transform="translate(80, 45)">
+    <rect width="44" height="44" rx="12" fill="url(#orange-grad)"/>
+    <text x="22" y="28" font-family="sans-serif" font-size="22" font-weight="bold" fill="#fff" text-anchor="middle">⚡</text>
+    <text x="60" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="800" fill="#f1f5f9">Cloudflare AI Mentor</text>
+    
+    <rect x="360" y="10" width="130" height="26" rx="13" fill="#1e293b" stroke="#334155"/>
+    <circle cx="376" cy="23" r="4" fill="#10b981"/>
+    <text x="388" y="27" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">Llama 3.3 70B</text>
+
+    <rect x="500" y="10" width="125" height="26" rx="13" fill="#1e293b" stroke="#334155"/>
+    <text x="562" y="27" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle">React 19 + Vite</text>
+
+    <rect x="635" y="10" width="145" height="26" rx="13" fill="#1e293b" stroke="#334155"/>
+    <text x="707" y="27" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#f59e0b" text-anchor="middle">D1 SQLite + Workflows</text>
+  </g>
+
+  <g transform="translate(80, 105)">
+    <rect width="1040" height="480" rx="16" fill="#131924" stroke="#26334d" stroke-width="1.5"/>
+    <path d="M0 16C0 7.16 7.16 0 16 0H1024C1032.84 0 1040 7.16 1040 16V48H0V16Z" fill="#182030" stroke="#26334d" stroke-width="1.5"/>
+    <circle cx="24" cy="24" r="6" fill="#ef4444"/>
+    <circle cx="44" cy="24" r="6" fill="#f59e0b"/>
+    <circle cx="64" cy="24" r="6" fill="#10b981"/>
+    <text x="520" y="28" font-family="sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">https://cf-ai-mentor.dev — Mock Technical Interview Platform</text>
+
+    <rect x="0" y="48" width="280" height="432" fill="#101520" stroke="#26334d" stroke-width="1"/>
+    
+    <g transform="translate(20, 68)">
+      <rect width="240" height="95" rx="10" fill="#182030" stroke="#26334d"/>
+      <text x="16" y="24" font-family="sans-serif" font-size="10" font-weight="700" fill="#64748b">CURRENT SESSION</text>
+      <text x="16" y="46" font-family="sans-serif" font-size="12" fill="#94a3b8">Topic: <tspan font-weight="bold" fill="#f1f5f9">System Design</tspan></text>
+      <text x="16" y="66" font-family="sans-serif" font-size="12" fill="#94a3b8">Difficulty: <tspan font-weight="bold" fill="#f59e0b">Hard</tspan></text>
+      <text x="16" y="86" font-family="sans-serif" font-size="12" fill="#94a3b8">Messages: <tspan font-weight="bold" fill="#f1f5f9">6</tspan></text>
+
+      <g transform="translate(0, 110)">
+        <rect width="240" height="190" rx="10" fill="#182030" stroke="#f38020" stroke-width="1.2"/>
+        <text x="16" y="24" font-family="sans-serif" font-size="11" font-weight="700" fill="#f38020">DEEP ANALYSIS (WORKFLOW)</text>
+        
+        <text x="16" y="50" font-family="sans-serif" font-size="12" fill="#94a3b8">Communication</text>
+        <rect x="175" y="37" width="48" height="18" rx="9" fill="rgba(16,185,129,0.15)"/>
+        <text x="199" y="50" font-family="sans-serif" font-size="11" font-weight="bold" fill="#10b981" text-anchor="middle">9/10</text>
+
+        <text x="16" y="76" font-family="sans-serif" font-size="12" fill="#94a3b8">Technical Accuracy</text>
+        <rect x="175" y="63" width="48" height="18" rx="9" fill="rgba(16,185,129,0.15)"/>
+        <text x="199" y="76" font-family="sans-serif" font-size="11" font-weight="bold" fill="#10b981" text-anchor="middle">8/10</text>
+
+        <text x="16" y="104" font-family="sans-serif" font-size="10" font-weight="bold" fill="#64748b">STRENGTHS</text>
+        <rect x="16" y="112" width="100" height="18" rx="4" fill="rgba(16,185,129,0.1)"/>
+        <text x="66" y="125" font-family="sans-serif" font-size="10" fill="#34d399" text-anchor="middle">Data Sharding</text>
+        <rect x="122" y="112" width="102" height="18" rx="4" fill="rgba(16,185,129,0.1)"/>
+        <text x="173" y="125" font-family="sans-serif" font-size="10" fill="#34d399" text-anchor="middle">Cache Invalidation</text>
+
+        <rect x="16" y="140" width="208" height="38" rx="4" fill="#0d121c" stroke="#f38020" stroke-width="0.8"/>
+        <text x="24" y="157" font-family="sans-serif" font-size="10" fill="#94a3b8">💡 Relational persistence in Cloudflare D1</text>
+        <text x="24" y="170" font-family="sans-serif" font-size="9" fill="#64748b">Synced across Durable Objects and SQLite</text>
+      </g>
+    </g>
+
+    <g transform="translate(300, 68)">
+      <g transform="translate(0, 10)">
+        <rect width="32" height="32" rx="8" fill="url(#orange-grad)"/>
+        <text x="16" y="21" font-family="sans-serif" font-size="15" fill="#fff" text-anchor="middle">⚡</text>
+        <rect x="44" y="0" width="660" height="88" rx="12" fill="#182030" stroke="#26334d"/>
+        <text x="60" y="22" font-family="sans-serif" font-size="11" font-weight="bold" fill="#f38020">AI INTERVIEWER</text>
+        <text x="60" y="44" font-family="sans-serif" font-size="13" fill="#f1f5f9">How would you design a distributed cache with high read throughput?</text>
+        <text x="60" y="66" font-family="sans-serif" font-size="13" fill="#94a3b8">Specifically consider replication, write strategies, and handling the thundering herd problem.</text>
+      </g>
+
+      <g transform="translate(90, 115)">
+        <rect x="0" y="0" width="580" height="95" rx="12" fill="#2563eb"/>
+        <text x="20" y="24" font-family="sans-serif" font-size="11" font-weight="bold" fill="#bfdbfe">YOU (CANDIDATE)</text>
+        <text x="20" y="46" font-family="sans-serif" font-size="13" fill="#fff">I would use a cluster of Redis nodes with consistent hashing for distribution.</text>
+        <text x="20" y="66" font-family="sans-serif" font-size="13" fill="#fff">For high throughput, I deploy read replicas with a cache-aside pattern, and use</text>
+        <text x="20" y="86" font-family="sans-serif" font-size="13" fill="#fff">single-flight request collapsing or mutex locks on cache misses to prevent stampedes.</text>
+        <rect x="590" y="0" width="32" height="32" rx="8" fill="#3b82f6"/>
+        <text x="606" y="21" font-family="sans-serif" font-size="15" fill="#fff" text-anchor="middle">👤</text>
+      </g>
+
+      <g transform="translate(0, 275)">
+        <rect width="710" height="70" rx="14" fill="#182030" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="20" y="32" font-family="sans-serif" font-size="13" fill="#f1f5f9">Type your answer or tap the mic for real-time speech-to-text…</text>
+        <text x="20" y="54" font-family="sans-serif" font-size="11" fill="#64748b">Press Enter to send · Shift+Enter for new line · Streaming from Llama 3.3 70B</text>
+        <circle cx="640" cy="35" r="16" fill="#1e293b" stroke="#334155"/>
+        <text x="640" y="40" font-family="sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">🎙️</text>
+        <circle cx="680" cy="35" r="16" fill="url(#orange-grad)"/>
+        <text x="680" y="39" font-family="sans-serif" font-size="13" fill="#fff" text-anchor="middle">➤</text>
+      </g>
+    </g>
+  </g>
+</svg>
