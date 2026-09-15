@@ -1,3 +1,4 @@
+import { MarkdownRenderer } from './MarkdownRenderer';
 import React, { useEffect, useRef } from 'react';
 import { Menu, Mic, BarChart3, Bot, User } from 'lucide-react';
 import { Message, SessionStats } from '../types';
@@ -91,7 +92,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <strong>{msg.role === 'user' ? 'Candidate' : 'AI Interviewer'}</strong>
                   <span>{formatTime(msg.timestamp)}</span>
                 </div>
-                <div className="message-bubble">{msg.content}</div>
+                <div className="message-bubble"><MarkdownRenderer content={msg.content} /></div>
               </div>
             </div>
           ))

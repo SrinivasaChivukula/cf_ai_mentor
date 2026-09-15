@@ -48,6 +48,217 @@ export function getOpeningQuestion(topic: string, difficulty: string): string {
   return topicMap[difficulty] || topicMap['medium'];
 }
 
+// ============================================================================
+// INTENT RECOGNITION & CONTEXTUAL KNOWLEDGE BASE
+// ============================================================================
+
+interface EvaluationResult {
+  feedback: string;
+  nextStep: string;
+}
+
+function handleSolutionsArchitectInquiry(): EvaluationResult {
+  return {
+    feedback: `### Core Questions & Focus Areas for a Solutions Architect Interview
+
+Solutions Architect interviews evaluate your ability to translate ambiguous business requirements into scalable, resilient, and cost-effective technical architectures. Typically, interview panels probe across **5 critical pillars**:
+
+1. **System Architecture & Decomposition**:
+   - *How do you decompose a monolithic transactional system into event-driven microservices without downtime?* (Look for: Strangler Fig pattern, CDC / Debezium, Outbox pattern, Saga choreography vs. orchestration).
+   - *When would you choose synchronous REST/gRPC versus asynchronous messaging (Kafka, SQS/SNS, RabbitMQ)?*
+
+2. **Scalability, Resilience & Disaster Recovery**:
+   - *How do you architect a multi-region active-active deployment?* (Look for: Anycast DNS/Cloudflare, data conflict resolution, RPO / RTO targets, and latency trade-offs).
+   - *How do you design for graceful degradation under cascading failures?* (Circuit breakers, bulkhead isolation, rate limiting with token-bucket/sliding window, retry with exponential backoff and jitter).
+
+3. **Data Architecture & Consistency Trade-offs**:
+   - *Navigating the CAP & PACELC theorems in practice:* When do you accept eventual consistency (e.g., shopping carts) vs. strict serializability (e.g., ledger balances)?
+   - *Database sharding & caching topologies:* How to handle cross-shard joins, hot keys, and eliminate cache stampedes / thundering herds.
+
+4. **Security, Compliance & Identity**:
+   - *Zero Trust architecture design:* mTLS between internal services, API gateway OAuth2/OIDC token verification, least-privilege IAM policies, and encrypting data at rest and in flight.
+
+5. **Cloud Economics (FinOps) & Trade-offs**:
+   - *Serverless (Cloudflare Workers, AWS Lambda) vs. Containerized (EKS/ECS) vs. Bare Metal:* How do cold starts, egress network costs, and memory footprints affect total cost of ownership (TCO)?
+   - *Build vs. Buy decisions:* How to justify vendor platforms vs. internal open-source maintenance.`,
+    nextStep: `Would you like to shift our session into a **Solutions Architecture scenario** (e.g., *"Design an edge-native, multi-region payment gateway handling 50k transactions/second with sub-50ms p99 latency"*), or would you prefer to resume your original technical interview topic?`,
+  };
+}
+
+function handleHelpOrHint(lastQuestion: string, topic: string): EvaluationResult {
+  const lq = lastQuestion.toLowerCase();
+
+  if (lq.includes('var') && lq.includes('let')) {
+    return {
+      feedback: `**Hint for 'var', 'let', 'const' & Hoisting:**
+- **Scope:** Think about curly braces \`{ ... }\` (block scope) versus \`function() { ... }\` (function scope). Which one is restricted to the block?
+- **Hoisting:** What does the JavaScript engine do during the creation phase before executing code line-by-line?
+- **Initialization:** If you try to \`console.log(x)\` before declaring \`var x = 5\`, what prints? What happens if you do the same with \`let x = 5\` (hint: Temporal Dead Zone)?
+- **Reassignment:** Can you re-assign or re-declare them? What about modifying an object assigned to a \`const\`?`,
+      nextStep: `Take a shot at contrasting them using these points!`,
+    };
+  }
+
+  if (lq.includes('event loop')) {
+    return {
+      feedback: `**Hint for Event Loop & Queues:**
+- Think of the JavaScript runtime as single-threaded: it executes synchronous code on the **Call Stack**.
+- When an asynchronous operation completes (like a resolved \`Promise\` or a \`setTimeout\` timer):
+  - Microtasks (e.g., \`Promise.then\`, \`queueMicrotask\`) go to the **Microtask Queue**.
+  - Macrotasks (e.g., \`setTimeout\`, \`setInterval\`, I/O) go to the **Task Queue**.
+- The event loop checks the microtask queue *exhaustively* after every stack turn before picking *one* macrotask.`,
+      nextStep: `How does that order affect code execution when you mix \`setTimeout(..., 0)\` and \`Promise.resolve().then(...)\`?`,
+    };
+  }
+
+  if (lq.includes('cap theorem')) {
+    return {
+      feedback: `**Hint for CAP Theorem:**
+- **C (Consistency):** Every read receives the most recent write or an error.
+- **A (Availability):** Every non-failing node returns a non-error response, but without guarantee it's the latest data.
+- **P (Partition Tolerance):** The system continues to operate despite arbitrary message loss or network delay between nodes.
+- Because physical network partitions are unavoidable in distributed systems, when a partition occurs, you must choose: either reject writes (favoring C) or accept writes on both sides (favoring A, leading to divergence).`,
+      nextStep: `Can you name an example of a CP system versus an AP system, and explain why a distributed system can't be 'CA'?`,
+    };
+  }
+
+  return {
+    feedback: `No worries! Let's break this down into first principles. Think about the fundamental trade-offs: time complexity vs. space complexity, consistency vs. availability, or runtime performance vs. developer velocity.`,
+    nextStep: `Would you like me to walk through the complete reference solution, or would you like to try with a simplified scenario?`,
+  };
+}
+
+function evaluateCandidateAnswer(
+  currentQuestion: string,
+  userMessage: string,
+  topic: string,
+  difficulty: string,
+  turnIndex: number
+): EvaluationResult {
+  const lq = currentQuestion.toLowerCase();
+  const ans = userMessage.toLowerCase();
+
+  // --- JavaScript 'var', 'let', 'const' & Hoisting ---
+  if (lq.includes('var') && (lq.includes('let') || lq.includes('const'))) {
+    const mentionsScope = ans.includes('block') || ans.includes('function') || ans.includes('scope');
+    const mentionsHoisting = ans.includes('hoist') || ans.includes('declaration') || ans.includes('undefined') || ans.includes('tdz') || ans.includes('temporal');
+    const mentionsReassign = ans.includes('reassign') || ans.includes('immutable') || ans.includes('mutate') || ans.includes('const');
+
+    if (mentionsScope && mentionsHoisting && mentionsReassign) {
+      return {
+        feedback: `### Evaluation: Outstanding (Score: 9.5/10)
+You hit every key technical distinction:
+- **Scoping:** Correctly identified that \`var\` is function-scoped (or globally scoped), whereas \`let\` and \`const\` are strictly block-scoped.
+- **Hoisting & TDZ:** Articulated that while all declarations are hoisted, \`var\` is initialized to \`undefined\`, whereas \`let\` and \`const\` remain in the **Temporal Dead Zone (TDZ)** from the start of the block until execution reaches the declaration.
+- **Immutability Nuance:** \`const\` prevents reassignment of the variable binding, though properties of objects/arrays assigned to \`const\` remain mutable unless frozen with \`Object.freeze()\`.`,
+        nextStep: `**Next Question:** Let's dive into asynchronous JavaScript: Can you contrast \`Promise.all()\`, \`Promise.allSettled()\`, and \`Promise.race()\`? In a resilient microfrontend or distributed UI, why might \`Promise.allSettled()\` be preferred over \`Promise.all()\`?`,
+      };
+    } else if (mentionsScope || mentionsReassign || mentionsHoisting) {
+      const missing: string[] = [];
+      if (!mentionsScope) missing.push('scope distinctions (function scope vs block scope)');
+      if (!mentionsHoisting) missing.push('hoisting semantics and the Temporal Dead Zone (TDZ)');
+      if (!mentionsReassign) missing.push('reassignment restrictions and binding immutability for const');
+
+      return {
+        feedback: `### Evaluation: Good Foundation, Missing Edge Details (Score: 7.5/10)
+You touched on the core concepts, but in a senior technical interview you should explicitly cover:
+- **Scope:** \`var\` is function-scoped, whereas \`let\` and \`const\` are block-scoped.
+- **Hoisting & TDZ:** \`var\` gets hoisted and initialized with \`undefined\`. \`let\` and \`const\` are hoisted as well, but accessing them before their line throws a \`ReferenceError\` due to the Temporal Dead Zone.
+- **Mutation:** Mentioning that \`const\` prevents variable rebinding, but does not deeply freeze nested object structures.`,
+        nextStep: `**Follow-up Question:** Given what you know about closures and variable scoping: How does using \`var\` in a \`for (var i = 0; i < 3; i++) { setTimeout(() => console.log(i), 100); }\` loop behave differently than using \`let i = 0\`, and why?`,
+      };
+    } else {
+      return {
+        feedback: `### Evaluation: Clarification Needed
+Your response didn't quite touch on the core criteria:
+1. **Scope:** Function scope (\`var\`) vs. Block scope (\`let\`, \`const\`).
+2. **Hoisting & Temporal Dead Zone (TDZ):** How \`var\` initializes to \`undefined\`, while \`let\`/\`const\` cannot be accessed before declaration.
+3. **Reassignment:** \`let\` allows reassignment, \`const\` creates an immutable binding.`,
+        nextStep: `How would you explain the difference in scope if you declared \`var x = 10\` inside an \`if (true) { ... }\` block versus \`let x = 10\`?`,
+      };
+    }
+  }
+
+  // --- JavaScript Event Loop ---
+  if (lq.includes('event loop') || lq.includes('microtask')) {
+    const mentionsMicro = ans.includes('microtask') || ans.includes('promise') || ans.includes('queue');
+    const mentionsMacro = ans.includes('macrotask') || ans.includes('settimeout') || ans.includes('task queue');
+    const mentionsStack = ans.includes('call stack') || ans.includes('stack') || ans.includes('single thread');
+
+    if (mentionsMicro && (mentionsMacro || mentionsStack)) {
+      return {
+        feedback: `### Evaluation: Strong Technical Depth (Score: 9.2/10)
+Excellent explanation of the JavaScript concurrency model. You accurately mapped:
+- **Call Stack:** Executes synchronous frames in LIFO order.
+- **Microtask Queue:** Handles \`Promise.then\`, \`catch\`, \`finally\`, and \`queueMicrotask\`. Emptied completely before yielding.
+- **Macrotask Queue:** Handles timers (\`setTimeout\`), DOM events, and I/O callbacks.
+- **Rendering Opportunity:** The browser renders/repaints after microtasks are cleared and before the next macrotask.`,
+        nextStep: `**Next Question:** If a microtask schedules another microtask recursively in a loop (e.g. \`function loop() { Promise.resolve().then(loop); }\`), what happens to the browser UI, macrotasks like \`setTimeout\`, and user inputs?`,
+      };
+    }
+  }
+
+  // --- CAP Theorem ---
+  if (lq.includes('cap theorem') || lq.includes('partition tolerance')) {
+    const mentionsTradeoff = ans.includes('consistency') && ans.includes('availability') && (ans.includes('partition') || ans.includes('network'));
+    if (mentionsTradeoff) {
+      return {
+        feedback: `### Evaluation: Solid Distributed Systems Acumen (Score: 9.0/10)
+Great articulation. As Eric Brewer established, in any distributed data store, network partitions (P) are an unavoidable physical reality (split-brain, fiber cuts, packet loss). Thus, the architectural choice is between:
+- **CP (Consistency + Partition Tolerance):** When partition occurs, reject or delay writes to prevent divergence (e.g., Spanner, Raft, etcd, ZooKeeper).
+- **AP (Availability + Partition Tolerance):** Accept writes on both sides of partition, accepting eventual consistency and conflict resolution (e.g., Cassandra, DynamoDB with eventual reads).`,
+        nextStep: `**Next Question:** The PACELC theorem expands on CAP by analyzing what happens when the network is running normally *without* partitions. Can you explain what PACELC trades off during normal operation (the 'ELC' half)?`,
+      };
+    }
+  }
+
+  // --- Default Analytical Fallback for Any Technical Topic ---
+  const questionsByTopic: Record<string, string[]> = {
+    'JavaScript & Web Development': [
+      "Now, consider memory management: How do closures in JavaScript retain references to outer scope variables, and what patterns lead to detached DOM tree memory leaks?",
+      "How does V8's hidden classes and inline caching optimize property access, and why is deleting object properties via \`delete obj.prop\` considered a deoptimization anti-pattern?",
+      "How would you design an asset-loading pipeline that prioritizes Critical Rendering Path resources using \`rel=preload\`, \`fetchpriority\`, and HTTP/3 multiplexing?",
+    ],
+    'System Design': [
+      "Now let's talk about scaling data: When your relational database hits write throughput limits, how do you approach horizontal sharding, and how do you handle cross-shard transactions?",
+      "Next, let's address caching consistency: When using a cache-aside pattern with Redis, what race condition can occur between a DB update and a cache read, and how do you eliminate thundering herds?",
+      "Consider reliability: How would you implement distributed rate limiting across edge PoPs? What are the tradeoffs between a token bucket and a sliding-window counter in Redis?",
+    ],
+    'Distributed Systems': [
+      "In distributed consensus, how does the Raft protocol handle network partitions where two candidates concurrently request votes in the same term?",
+      "How would you design a distributed lock service? What are the dangers of relying solely on Redis \`SETNX\` with TTL without fencing tokens (as noted in Martin Kleppmann's analysis)?",
+      "In an event-driven architecture using Kafka, how do you guarantee exactly-once processing (EOP) semantics end-to-end between producers, topics, and consumers?",
+    ],
+    'Data Structures & Algorithms': [
+      "If we need to find the Kth largest element in an unsorted stream of 100 million integers, how would you design a Min-Heap solution versus Quickselect?",
+      "Now, how would you detect a cycle in a directed graph? Walk me through Kahn's algorithm (topological sort via indegree) versus DFS with three-color node marking.",
+      "Consider dynamic programming: How would you approach the Coin Change problem (minimum coins for an amount)? Can you state the recurrence relation and space-optimized bottom-up formulation?",
+    ],
+  };
+
+  const pool = questionsByTopic[topic] || questionsByTopic['System Design'];
+  const nextQ = pool[turnIndex % pool.length];
+
+  const wordCount = userMessage.trim().split(/\s+/).length;
+  let critique = "";
+
+  if (wordCount < 15) {
+    critique = `### Initial Assessment (Score: 6.8/10)
+Your answer is on the right track, but quite brief. In senior technical interviews, interviewers look for structured reasoning: state your design principle first, explain the operational trade-offs, and highlight real-world edge cases.`;
+  } else if (ans.includes('tradeoff') || ans.includes('scaling') || ans.includes('latency') || ans.includes('bottleneck') || ans.includes('complexity')) {
+    critique = `### Technical Assessment (Score: 8.8/10)
+Strong response. You effectively incorporated engineering trade-offs, operational considerations, and system behavior under load.`;
+  } else {
+    critique = `### Technical Assessment (Score: 8.0/10)
+Solid explanation covering the primary mechanics. A great way to elevate this response is to discuss failure recovery modes and operational metrics (e.g., p99 latency degradation, concurrency locks).`;
+  }
+
+  return {
+    feedback: critique,
+    nextStep: `**Next Question:** ${nextQ}`,
+  };
+}
+
 export async function generateStreamingResponse(
   topic: string,
   difficulty: string,
@@ -56,64 +267,86 @@ export async function generateStreamingResponse(
   onChunk: (chunk: string) => void
 ): Promise<string> {
   const turnIndex = Math.floor(messageHistory.length / 2);
-  let feedback = "";
-  let nextQuestion = "";
+  const trimmed = userMessage.trim();
+  const lower = trimmed.toLowerCase();
 
-  const trimmed = userMessage.trim().toLowerCase();
-
-  if (trimmed.length < 25) {
-    feedback = "Good initial thought, but in a technical interview setting you want to elaborate with concrete code examples, time/space complexities, and operational edge cases.";
-  } else if (trimmed.includes("because") || trimmed.includes("complexity") || trimmed.includes("tradeoff") || trimmed.includes("scaling")) {
-    feedback = "Excellent response. You articulated the architectural tradeoffs clearly and addressed the underlying operational considerations.";
-  } else {
-    feedback = "Solid explanation. You covered the core concepts well. A good follow-up consideration here is how this behaves under concurrent load or failure modes.";
+  // Find the last assistant question asked
+  let lastAssistantQuestion = "";
+  for (let i = messageHistory.length - 1; i >= 0; i--) {
+    if (messageHistory[i].role === 'assistant' && messageHistory[i].content) {
+      lastAssistantQuestion = messageHistory[i].content;
+      break;
+    }
   }
 
-  if (topic.includes("JavaScript")) {
-    const questions = [
-      "Now, consider memory management: How do closures in JavaScript retain references to outer scope variables, and what are common patterns that inadvertently lead to detached DOM tree memory leaks?",
-      "Let's touch on asynchronous programming: Can you contrast Promise.all(), Promise.allSettled(), and Promise.race()? When would you choose allSettled over all in resilient production microfrontends?",
-      "Next, how does V8's hidden classes and inline caching optimize property access in JavaScript objects, and why is deleting object properties considered a deoptimization anti-pattern?",
-    ];
-    nextQuestion = questions[turnIndex % questions.length];
-  } else if (topic.includes("System Design") || topic.includes("Distributed")) {
-    const questions = [
-      "Now let's talk about scaling data: When your relational database hits write throughput limits, how do you approach database sharding (e.g., hash-based vs range-based key partitioning), and how do you handle cross-shard queries?",
-      "Next, let's address caching consistency: When using a cache-aside pattern with Redis, what race condition can occur between a database update and a cache read, and how do you eliminate cache stampedes / thundering herds?",
-      "Consider reliability: How would you implement rate limiting across multiple server instances? What are the tradeoffs between a token bucket algorithm and sliding window log using Redis sorted sets?",
-    ];
-    nextQuestion = questions[turnIndex % questions.length];
-  } else if (topic.includes("Algorithms")) {
-    const questions = [
-      "Good. Let's analyze time and space complexity: If we need to find the Kth largest element in an unsorted stream of 100 million integers, how would you design a Min-Heap solution versus Quickselect?",
-      "Now, how would you detect a cycle in a directed graph? Walk me through Kahn's algorithm (topological sort via indegree) versus DFS with three-color node marking.",
-      "Consider dynamic programming: How would you approach the Coin Change problem (minimum coins for an amount)? Can you state the recurrence relation and space-optimized bottom-up formulation?",
-    ];
-    nextQuestion = questions[turnIndex % questions.length];
-  } else {
-    const questions = [
-      "Great. Now, what potential failure modes or edge cases would you anticipate with this approach in a high-traffic production environment?",
-      "How would you instrument this system with observability (metrics, structured logs, distributed tracing) to detect anomalies in real time?",
-      "If requirements scaled by 100x tomorrow, which layer of your design would become the primary bottleneck, and how would you refactor it?",
-    ];
-    nextQuestion = questions[turnIndex % questions.length];
+  let result: EvaluationResult;
+
+  // 1. Check if user is asking about Solutions Architect
+  if (
+    lower.includes('solution') && (lower.includes('architect') || lower.includes('architecture')) ||
+    (lower.includes('prepare for') && lower.includes('architect'))
+  ) {
+    result = handleSolutionsArchitectInquiry();
+  }
+  // 2. Check if user is asking for hints, help, or saying "I don't know"
+  else if (
+    lower === "i don't know" ||
+    lower === "idk" ||
+    lower.includes("not sure") ||
+    lower.includes("give me a hint") ||
+    lower.includes("can you help") ||
+    lower.includes("explain the question") ||
+    lower.includes("can you clarify") ||
+    lower === "skip" ||
+    lower === "pass"
+  ) {
+    result = handleHelpOrHint(lastAssistantQuestion, topic);
+  }
+  // 3. Check if user is asking a general technical question instead of answering
+  else if (
+    (lower.startsWith('what is') ||
+      lower.startsWith('what are') ||
+      lower.startsWith('how does') ||
+      lower.startsWith('how do i') ||
+      lower.startsWith('why do') ||
+      lower.startsWith('can you explain')) &&
+    !lower.includes('var') &&
+    !lower.includes('event loop')
+  ) {
+    result = {
+      feedback: `That's an insightful question to explore. In system design and software architecture, understanding this concept is essential:
+      
+When evaluating this domain, architects look at **operational bounds** (throughput, memory overhead, latency percentiles) and **architectural decoupling** (independent deployability, boundary contexts).`,
+      nextStep: `Would you like us to deep-dive into that architectural area for the remainder of this session, or shall we return to evaluating your current question: *"${lastAssistantQuestion.slice(0, 100)}..."*?`,
+    };
+  }
+  // 4. Normal answer evaluation
+  else {
+    result = evaluateCandidateAnswer(
+      lastAssistantQuestion,
+      trimmed,
+      topic,
+      difficulty,
+      turnIndex
+    );
   }
 
-  const fullResponse = `${feedback}\n\n**Next Question:** ${nextQuestion}`;
+  const fullResponse = `${result.feedback}\n\n${result.nextStep}`;
 
-  const chunkSize = 6;
+  // Stream token-by-token with realistic cadence
+  const chunkSize = 8;
   for (let i = 0; i < fullResponse.length; i += chunkSize) {
     const piece = fullResponse.slice(i, i + chunkSize);
     onChunk(piece);
-    await new Promise((r) => setTimeout(r, 14));
+    await new Promise((r) => setTimeout(r, 12));
   }
 
   return fullResponse;
 }
 
 export function generateAnalysisData(topic: string, difficulty: string, messages: Message[]): { analysis: AnalysisData; followUp: string } {
-  const commScore = Math.min(10, Math.max(7, Math.floor(7.5 + (messages.length * 0.4))));
-  const techScore = Math.min(10, Math.max(7, Math.floor(8.0 + (messages.length * 0.3))));
+  const commScore = Math.min(10, Math.max(7, Math.floor(7.8 + (messages.length * 0.35))));
+  const techScore = Math.min(10, Math.max(7, Math.floor(8.2 + (messages.length * 0.28))));
 
   return {
     analysis: {
@@ -121,13 +354,13 @@ export function generateAnalysisData(topic: string, difficulty: string, messages
       technicalScore: techScore,
       strengths: [
         "Structured, methodical problem decomposition",
-        "Clear articulation of architectural tradeoffs",
-        "Attention to edge cases and runtime complexities",
+        "Clear articulation of architectural tradeoffs and NFRs",
+        "Attention to edge cases, error modes, and runtime complexities",
         "Concise technical vocabulary and system reasoning",
       ],
       gaps: [
-        "Deep-dive into zero-downtime database migration strategies",
-        "Quantifying latency bounds under network degradation",
+        "Deep-dive into zero-downtime database schema migration strategies",
+        "Quantifying p99 latency bounds under network degradation",
         "Detailed memory footprint analysis in concurrent workloads",
       ],
       nextFocus: [
