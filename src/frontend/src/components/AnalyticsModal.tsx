@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, Database, CheckCircle, BarChart3, TrendingUp, RefreshCw } from 'lucide-react';
+import { X, Database, BarChart3, TrendingUp, RefreshCw } from 'lucide-react';
 import { AnalyticsData } from '../types';
+import { getMockAnalytics } from '../services/interviewEngine';
 
 interface AnalyticsModalProps {
   isOpen: boolean;
@@ -17,11 +18,16 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
     setError(null);
     try {
       const res = await fetch('/api/analytics');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = (await res.json()) as AnalyticsData;
-      setData(json);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch D1 analytics');
+      if (res.ok) {
+        const json = (await res.json()) as AnalyticsData;
+        setData(json);
+      } else {
+        // Fallback for static live demo
+        setData(getMockAnalytics());
+      }
+    } catch {
+      // Network failure / static demo fallback
+      setData(getMockAnalytics());
     } finally {
       setLoading(false);
     }

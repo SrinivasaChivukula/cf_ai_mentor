@@ -5,6 +5,11 @@ import { ChatArea } from './components/ChatArea';
 import { InputArea } from './components/InputArea';
 import { AnalyticsModal } from './components/AnalyticsModal';
 import { Message, SessionStats, AnalysisData } from './types';
+import {
+  getOpeningQuestion,
+  generateStreamingResponse,
+  generateAnalysisData,
+} from './services/interviewEngine';
 import './styles.css';
 
 function generateSessionId() {
@@ -51,14 +56,25 @@ export const App: React.FC = () => {
     setStats({
       topic: selectedTopic,
       difficulty: selectedDifficulty,
-      messageCount: 0,
+      messageCount: 1,
     });
-    setMessages([]);
+
+    // Opening greeting and targeted first question from the AI mentor
+    const openingQ = getOpeningQuestion(selectedTopic, selectedDifficulty);
+    const openingMessage: Message = {
+      id: 'msg_' + Date.now(),
+      role: 'assistant',
+      content: openingQ,
+      timestamp: Date.now(),
+    };
+
+    setMessages([openingMessage]);
     setLatestAnalysis(null);
     setFollowUp(null);
     setIsSetupOpen(false);
     setStatus('online');
     setStatusText('AI ready');
+    addToast(`Interview started: ${selectedTopic} (${selectedDifficulty})`, 'success');
   };
 
   const handleNewSession = async () => {
@@ -88,11 +104,20 @@ export const App: React.FC = () => {
       timestamp: Date.now(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setStats((prev) => ({ ...prev, messageCount: prev.messageCount + 1 }));
     setIsStreaming(true);
     setStatus('thinking');
     setStatusText('Thinking…');
+
+    const assistantMsgId = 'msg_' + (Date.now() + 1);
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantMsgId, role: 'assistant', content: '', timestamp: Date.now() },
+    ]);
+
+    let connectedToWorker = false;
 
     try {
       const response = await fetch('/api/chat', {
@@ -106,74 +131,65 @@ export const App: React.FC = () => {
         }),
       });
 
-      if (!response.ok) {
-        let errorMsg = 'HTTP ' + response.status;
-        try {
-          const errJson = (await response.json()) as { error?: string };
-          if (errJson?.error) errorMsg = errJson.error;
-        } catch {
-          try {
-            const errText = await response.text();
-            if (errText) errorMsg = errText.slice(0, 160);
-          } catch {}
-        }
-        throw new Error(errorMsg);
-      }
+      if (response.ok && response.body) {
+        connectedToWorker = true;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantText = '';
+        let sseBuffer = '';
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No readable response stream');
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      const decoder = new TextDecoder();
-      let assistantText = '';
-      const assistantMsgId = 'msg_' + (Date.now() + 1);
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop() ?? '';
 
-      // Optimistically create assistant message bubble
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantMsgId, role: 'assistant', content: '', timestamp: Date.now() },
-      ]);
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data: ')) continue;
+            const data = trimmed.slice(6).trim();
+            if (data === '[DONE]') break;
 
-      let sseBuffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        sseBuffer += decoder.decode(value, { stream: true });
-        const lines = sseBuffer.split('\n');
-        // Keep incomplete line in buffer for the next TCP chunk
-        sseBuffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data: ')) continue;
-          const data = trimmed.slice(6).trim();
-          if (data === '[DONE]') break;
-
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.response) {
-              assistantText += parsed.response;
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
-              );
-            }
-          } catch {
-            /* Incomplete JSON within single line */
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed?.response) {
+                assistantText += parsed.response;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
+                );
+              }
+            } catch {}
           }
         }
       }
-
-      setStats((prev) => ({ ...prev, messageCount: prev.messageCount + 1 }));
-      setStatus('online');
-      setStatusText('AI ready');
-    } catch (err: any) {
-      addToast('Error: ' + (err?.message || 'Chat request failed'), 'error');
-      setStatus('online');
-      setStatusText('AI ready');
-    } finally {
-      setIsStreaming(false);
+    } catch {
+      // Backend unreachable or offline
     }
+
+    // If backend was not reached or returned 404 (e.g. running on static GitHub Pages),
+    // run the client-side streaming interview engine seamlessly
+    if (!connectedToWorker) {
+      let accumulated = '';
+      await generateStreamingResponse(
+        stats.topic,
+        stats.difficulty,
+        text,
+        updatedMessages,
+        (token) => {
+          accumulated += token;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantMsgId ? { ...m, content: accumulated } : m))
+          );
+        }
+      );
+    }
+
+    setStats((prev) => ({ ...prev, messageCount: prev.messageCount + 1 }));
+    setStatus('online');
+    setStatusText('AI ready');
+    setIsStreaming(false);
   };
 
   const handleAnalyze = async () => {
@@ -182,7 +198,9 @@ export const App: React.FC = () => {
     setIsAnalyzing(true);
     setStatus('thinking');
     setStatusText('Running analysis…');
-    addToast('Deep analysis started via Cloudflare Workflows', 'info');
+    addToast('Analyzing interview responses…', 'info');
+
+    let triggeredWorkflow = false;
 
     try {
       const res = await fetch('/api/analyze', {
@@ -195,22 +213,29 @@ export const App: React.FC = () => {
         }),
       });
 
-      const data = (await res.json()) as any;
-      if (!res.ok) {
-        addToast(data.error || 'Failed to start analysis', 'error');
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (data?.workflowId) {
+          triggeredWorkflow = true;
+          pollWorkflow(data.workflowId);
+        }
+      }
+    } catch {
+      // Offline / static environment
+    }
+
+    if (!triggeredWorkflow) {
+      // Client-side simulation for live GitHub Pages preview
+      setTimeout(() => {
+        const result = generateAnalysisData(stats.topic, stats.difficulty, messages);
+        setLatestAnalysis(result.analysis);
+        setFollowUp(result.followUp);
         setIsAnalyzing(false);
         setStatus('online');
         setStatusText('AI ready');
-        return;
-      }
-
-      const workflowId = data.workflowId;
-      pollWorkflow(workflowId);
-    } catch (err: any) {
-      addToast('Analysis initiation error', 'error');
-      setIsAnalyzing(false);
-      setStatus('online');
-      setStatusText('AI ready');
+        setIsSidebarOpen(true);
+        addToast('Evaluation complete! See scorecard in sidebar.', 'success');
+      }, 1500);
     }
   };
 
@@ -220,7 +245,6 @@ export const App: React.FC = () => {
 
     pollIntervalRef.current = setInterval(async () => {
       pollCountRef.current += 1;
-      // Cap at 30 polls (~90 seconds)
       if (pollCountRef.current > 30) {
         clearInterval(pollIntervalRef.current);
         setIsAnalyzing(false);
@@ -232,51 +256,38 @@ export const App: React.FC = () => {
 
       try {
         const res = await fetch('/api/workflow/' + workflowId);
-        if (!res.ok) {
-          if (pollCountRef.current > 5) {
+        if (res.ok) {
+          const statusData = (await res.json()) as any;
+          if (statusData.status === 'complete') {
             clearInterval(pollIntervalRef.current);
             setIsAnalyzing(false);
             setStatus('online');
             setStatusText('AI ready');
-            addToast('Unable to check workflow status', 'error');
+            addToast('Analysis complete! Persisted to DO & D1.', 'success');
+            loadAnalysis();
+          } else if (statusData.status === 'errored') {
+            clearInterval(pollIntervalRef.current);
+            setIsAnalyzing(false);
+            setStatus('online');
+            setStatusText('AI ready');
+            addToast('Analysis workflow encountered an error', 'error');
           }
-          return;
         }
-
-        const statusData = (await res.json()) as any;
-
-        if (statusData.status === 'complete') {
-          clearInterval(pollIntervalRef.current);
-          setIsAnalyzing(false);
-          setStatus('online');
-          setStatusText('AI ready');
-          addToast('Analysis complete! Persisted to DO & D1.', 'success');
-          loadAnalysis();
-        } else if (statusData.status === 'errored') {
-          clearInterval(pollIntervalRef.current);
-          setIsAnalyzing(false);
-          setStatus('online');
-          setStatusText('AI ready');
-          addToast('Analysis workflow encountered an error', 'error');
-        }
-      } catch {
-        /* retry on next interval */
-      }
+      } catch {}
     }, 3000);
   };
 
   const loadAnalysis = async () => {
     try {
       const res = await fetch('/api/session/' + sessionId + '/analysis');
-      if (!res.ok) return;
-      const data = (await res.json()) as any;
-      if (data?.latestAnalysis) {
-        setLatestAnalysis(data.latestAnalysis.analysis);
-        setFollowUp(data.latestAnalysis.followUp);
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (data?.latestAnalysis) {
+          setLatestAnalysis(data.latestAnalysis.analysis);
+          setFollowUp(data.latestAnalysis.followUp);
+        }
       }
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   };
 
   useEffect(() => {
