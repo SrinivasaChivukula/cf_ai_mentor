@@ -2,7 +2,7 @@
 
 An enterprise-grade, full-stack AI technical interview coach running entirely on Cloudflare's edge platform and powered by Llama 3.3 70B, React 19, Cloudflare D1 (SQLite), Durable Objects, and Cloudflare Workflows.
 
-[![Demo Preview](docs/demo-preview.svg)](https://cf-ai-mentor.dev)
+[![Demo Preview](docs/demo-preview.svg)](https://srinivasachivukula.github.io/cf_ai_mentor/)
 
 [![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white)](https://vitejs.dev)
@@ -16,7 +16,7 @@ An enterprise-grade, full-stack AI technical interview coach running entirely on
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088ff?logo=githubactions&logoColor=white)](https://github.com/SrinivasaChivukula/cf_ai_mentor/actions)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-🌐 **Production Domain:** [https://cf-ai-mentor.dev](https://cf-ai-mentor.dev)  
+🌐 **Live Interactive Web Demo:** [https://srinivasachivukula.github.io/cf_ai_mentor/](https://srinivasachivukula.github.io/cf_ai_mentor/)  
 ⚡ **Edge Workers URL:** [https://cf-ai-mentor.lucifer96389.workers.dev](https://cf-ai-mentor.lucifer96389.workers.dev)
 
 ---
