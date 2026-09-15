@@ -8,6 +8,9 @@ import { Message, SessionStats, AnalysisData } from './types';
 import './styles.css';
 
 function generateSessionId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return 'sess_' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+  }
   return 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
@@ -32,6 +35,7 @@ export const App: React.FC = () => {
   const [toasts, setToasts] = useState<Array<{ id: number; text: string; type: string }>>([]);
 
   const pollIntervalRef = useRef<any>(null);
+  const pollCountRef = useRef<number>(0);
 
   const addToast = useCallback((text: string, type: 'info' | 'success' | 'error' = 'info') => {
     const id = Date.now() + Math.random();
@@ -102,7 +106,19 @@ export const App: React.FC = () => {
         }),
       });
 
-      if (!response.ok) throw new Error('HTTP ' + response.status);
+      if (!response.ok) {
+        let errorMsg = 'HTTP ' + response.status;
+        try {
+          const errJson = (await response.json()) as { error?: string };
+          if (errJson?.error) errorMsg = errJson.error;
+        } catch {
+          try {
+            const errText = await response.text();
+            if (errText) errorMsg = errText.slice(0, 160);
+          } catch {}
+        }
+        throw new Error(errorMsg);
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No readable response stream');
@@ -117,16 +133,21 @@ export const App: React.FC = () => {
         { id: assistantMsgId, role: 'assistant', content: '', timestamp: Date.now() },
       ]);
 
+      let sseBuffer = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        sseBuffer += decoder.decode(value, { stream: true });
+        const lines = sseBuffer.split('\n');
+        // Keep incomplete line in buffer for the next TCP chunk
+        sseBuffer = lines.pop() ?? '';
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6).trim();
           if (data === '[DONE]') break;
 
           try {
@@ -138,7 +159,7 @@ export const App: React.FC = () => {
               );
             }
           } catch {
-            /* partial json */
+            /* Incomplete JSON within single line */
           }
         }
       }
@@ -195,10 +216,33 @@ export const App: React.FC = () => {
 
   const pollWorkflow = (workflowId: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollCountRef.current = 0;
 
     pollIntervalRef.current = setInterval(async () => {
+      pollCountRef.current += 1;
+      // Cap at 30 polls (~90 seconds)
+      if (pollCountRef.current > 30) {
+        clearInterval(pollIntervalRef.current);
+        setIsAnalyzing(false);
+        setStatus('online');
+        setStatusText('AI ready');
+        addToast('Analysis timed out. Please try again.', 'error');
+        return;
+      }
+
       try {
         const res = await fetch('/api/workflow/' + workflowId);
+        if (!res.ok) {
+          if (pollCountRef.current > 5) {
+            clearInterval(pollIntervalRef.current);
+            setIsAnalyzing(false);
+            setStatus('online');
+            setStatusText('AI ready');
+            addToast('Unable to check workflow status', 'error');
+          }
+          return;
+        }
+
         const statusData = (await res.json()) as any;
 
         if (statusData.status === 'complete') {
@@ -216,7 +260,7 @@ export const App: React.FC = () => {
           addToast('Analysis workflow encountered an error', 'error');
         }
       } catch {
-        /* retry poll */
+        /* retry on next interval */
       }
     }, 3000);
   };
@@ -224,6 +268,7 @@ export const App: React.FC = () => {
   const loadAnalysis = async () => {
     try {
       const res = await fetch('/api/session/' + sessionId + '/analysis');
+      if (!res.ok) return;
       const data = (await res.json()) as any;
       if (data?.latestAnalysis) {
         setLatestAnalysis(data.latestAnalysis.analysis);
